@@ -7,5 +7,5 @@ python:
 install:
   - set -x
   - python --version 2>&1 | grep -q " 2." && python bootstrap.py || python bootstrap2.py
-  - ./bin/buildout buildout:parts=test
+  - ./bin/buildout buildout:parts=test -N
 script: python --version 2>&1 | grep -q " 2." && ./bin/py.test || ./bin/py.test build/lib/
