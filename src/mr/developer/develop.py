@@ -93,7 +93,7 @@ class Develop(object):
         extension = Extension(buildout)
         self.sources = extension.get_sources()
         self.sources_dir = extension.get_sources_dir()
-        self.auto_checkout = extension.get_auto_checkout()
+        self.auto_checkout = extension.get_all_auto_checkout()
         self.always_checkout = extension.get_always_checkout()
         self.update_git_submodules = extension.get_update_git_submodules()
         self.always_accept_server_certificate = extension.get_always_accept_server_certificate()

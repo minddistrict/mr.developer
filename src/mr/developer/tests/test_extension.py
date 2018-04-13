@@ -99,11 +99,11 @@ class TestExtensionClass:
 
     def testAutoCheckoutMissingSource(self, buildout, extension):
         buildout['buildout']['auto-checkout'] = 'pkg.foo'
-        pytest.raises(SystemExit, extension.get_auto_checkout)
+        pytest.raises(SystemExit, extension.get_all_auto_checkout)
 
     def testAutoCheckoutMissingSources(self, buildout, extension):
         buildout['buildout']['auto-checkout'] = 'pkg.foo pkg.bar'
-        pytest.raises(SystemExit, extension.get_auto_checkout)
+        pytest.raises(SystemExit, extension.get_all_auto_checkout)
 
     def testAutoCheckoutWildcard(self, buildout, extension):
         buildout['sources'].update({

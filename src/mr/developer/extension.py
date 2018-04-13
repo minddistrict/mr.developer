@@ -11,6 +11,13 @@ FAKE_PART_ID = '_mr.developer'
 logger = logging.getLogger("mr.developer")
 
 
+def _format_items(items):
+    items = list(sorted(items))
+    if len(items) > 1:
+        return "%s and '%s'" % (", ".join("'%s'" % x for x in items[:-1]), items[-1])
+    return items[0]
+
+
 class Source(dict):
     def exists(self):
         return os.path.exists(self['path'])
@@ -65,6 +72,10 @@ class Extension(object):
                 section = {}
             else:
                 raise
+        preferred_branches = None
+        if 'preferred-branches' in self.buildout['buildout']:
+            preferred_branches = self.buildout['buildout']['preferred-branches'].split()
+        features_auto_checkout = set(self.buildout['buildout'].get('features-checkout', '').split())
         workingcopytypes = get_workingcopytypes()
         for name in section:
             info = section[name].split()
@@ -118,6 +129,8 @@ class Extension(object):
                         value = True
                     elif value.lower() in ('false', 'no', 'off'):
                         value = False
+                if key == 'preferred-branches':
+                    value = value.split()
                 if key == 'depth':
                     try:
                         not_used = int(value)  # noqa
@@ -130,9 +143,14 @@ class Extension(object):
                 else:
                     source['path'] = os.path.join(sources_dir, name)
 
-            if 'depth' not in source and \
-                    self.get_git_clone_depth():
+            if 'depth' not in source and self.get_git_clone_depth():
                 source['depth'] = self.get_git_clone_depth()
+
+            if 'preferred-branches' not in source:
+                if name in features_auto_checkout:
+                    source['preferred-branches'] = []
+                elif preferred_branches:
+                    source['preferred-branches'] = preferred_branches
 
             for rewrite in self.get_config().rewrites:
                 rewrite(source)
@@ -141,26 +159,32 @@ class Extension(object):
 
         return sources
 
-    @memoize
-    def get_auto_checkout(self):
+    def _get_auto_checkout_for(self, key):
         packages = set(self.get_sources().keys())
 
-        auto_checkout = set(
-            self.buildout['buildout'].get('auto-checkout', '').split()
-        )
-        if '*' in auto_checkout:
-            auto_checkout = packages
+        checkout = set(self.buildout['buildout'].get(key, '').split())
+        if '*' in checkout:
+            checkout = packages
 
-        if not auto_checkout.issubset(packages):
-            diff = list(sorted(auto_checkout.difference(packages)))
+        if not checkout.issubset(packages):
+            diff = checkout.difference(packages)
             if len(diff) > 1:
-                pkgs = "%s and '%s'" % (", ".join("'%s'" % x for x in diff[:-1]), diff[-1])
-                logger.error("The packages %s from auto-checkout have no source information." % pkgs)
+                logger.error("The packages %s from auto-checkout have no source information." % _format_items(diff))
             else:
-                logger.error("The package '%s' from auto-checkout has no source information." % diff[0])
+                logger.error("The package '%s' from auto-checkout has no source information." % list(diff)[0])
             sys.exit(1)
 
-        return auto_checkout
+        return checkout
+
+    @memoize
+    def get_all_auto_checkout(self):
+        auto = self._get_auto_checkout_for('auto-checkout')
+        features = self._get_auto_checkout_for('features-checkout')
+
+        diff = auto.intersection(features)
+        if diff:
+            logger.error("The packages %s are in auto-default and default-auto-checkout." % _format_items(diff))
+        return auto.union(features)
 
     def get_always_checkout(self):
         return self.buildout['buildout'].get('always-checkout', False)
@@ -178,7 +202,7 @@ class Extension(object):
         return value
 
     def get_develop_info(self):
-        auto_checkout = self.get_auto_checkout()
+        all_auto_checkout = self.get_all_auto_checkout()
         sources = self.get_sources()
         develop = self.buildout['buildout'].get('develop', '')
         versions_section = self.buildout['buildout'].get('versions')
@@ -195,9 +219,9 @@ class Extension(object):
             source = sources[name]
             if source.get('egg', True) and name not in develeggs:
                 path = sources[name]['path']
-                status = config_develop.get(name, name in auto_checkout)
+                status = config_develop.get(name, name in all_auto_checkout)
                 if os.path.exists(path) and status:
-                    if name in auto_checkout:
+                    if name in all_auto_checkout:
                         config_develop.setdefault(name, 'auto')
                     else:
                         if status == 'auto':
@@ -249,7 +273,7 @@ class Extension(object):
         if os.path.split(self.executable)[1] in ('buildout', 'buildout-script.py'):
             config.buildout_args = list(sys.argv)
 
-        auto_checkout = self.get_auto_checkout()
+        all_auto_checkout = self.get_all_auto_checkout()
 
         root_logger = logging.getLogger()
         workingcopies = self.get_workingcopies()
@@ -258,7 +282,7 @@ class Extension(object):
         always_accept_server_certificate = self.get_always_accept_server_certificate()
         (develop, develeggs, versions) = self.get_develop_info()
 
-        packages = set(auto_checkout)
+        packages = set(all_auto_checkout)
         sources = self.get_sources()
         for pkg in develeggs:
             if pkg in sources:

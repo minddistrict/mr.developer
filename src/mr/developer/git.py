@@ -87,6 +87,21 @@ class GitWorkingCopy(common.BaseWorkingCopy):
         else:
             return 'remotes/%s' % self._upstream_name
 
+    def auto_select_branch(self):
+        branch = self.source.get('branch')
+        preferred = self.source.get('preferred-branches')
+        if branch is not None or preferred is None:
+            return
+        cmd = self.run_git(["symbolic-ref", "--short", "HEAD"])
+        stdout, stderr = cmd.communicate()
+        if cmd.returncode != 0:
+            return
+        branch = s(stdout).strip()
+        if branch not in preferred and len(preferred):
+            branch = preferred[0]
+        self.output((logger.info, "Auto-selecting branch %s" % branch))
+        self.source['branch'] = branch
+
     def run_git(self, commands, **kwargs):
         commands.insert(0, self.git_executable)
         kwargs['stdout'] = subprocess.PIPE
@@ -99,7 +114,6 @@ class GitWorkingCopy(common.BaseWorkingCopy):
     def git_merge_rbranch(self, stdout_in, stderr_in, accept_missing=False):
         path = self.source['path']
         branch = self.source.get('branch', 'master')
-
         cmd = self.run_git(["branch", "-a"], cwd=path)
         stdout, stderr = cmd.communicate()
         if cmd.returncode != 0:
@@ -245,6 +259,7 @@ class GitWorkingCopy(common.BaseWorkingCopy):
     def checkout(self, **kwargs):
         name = self.source['name']
         path = self.source['path']
+        self.auto_select_branch()
         update = self.should_update(**kwargs)
         if os.path.exists(path):
             if update:
@@ -291,6 +306,7 @@ class GitWorkingCopy(common.BaseWorkingCopy):
             self.output((logger.warning, "Can't update package '%s' because its URL doesn't match." % name))
         if self.status() != 'clean' and not kwargs.get('force', False):
             raise GitError("Can't update package '%s' because it's dirty." % name)
+        self.auto_select_branch()
         return self.git_update(**kwargs)
 
     def git_set_pushurl(self, stdout_in, stderr_in):
