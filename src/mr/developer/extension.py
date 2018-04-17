@@ -180,10 +180,6 @@ class Extension(object):
     def get_all_auto_checkout(self):
         auto = self._get_auto_checkout_for('auto-checkout')
         features = self._get_auto_checkout_for('features-checkout')
-
-        diff = auto.intersection(features)
-        if diff:
-            logger.error("The packages %s are in auto-default and default-auto-checkout." % _format_items(diff))
         return auto.union(features)
 
     def get_always_checkout(self):
