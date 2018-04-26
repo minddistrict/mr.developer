@@ -3,7 +3,7 @@ from setuptools import setup
 import sys
 
 
-version = '1.39b2+md.2.dev0'
+version = '1.39b3+md.1'
 
 
 def has_environment_marker_support():
