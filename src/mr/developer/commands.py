@@ -285,7 +285,7 @@ class CmdHelp(Command):
             if name == 'pony':
                 continue
             cmds.setdefault(choices[name], set()).add(name)
-        for cmd, names in cmds.items():
+        for cmd, names in list(cmds.items()):
             names = list(reversed(sorted(names, key=len)))
             cmds[names[0]] = dict(
                 aliases=names[1:],
@@ -820,3 +820,50 @@ class CmdUpdate(Command):
                              verbose=args.verbose,
                              submodules=self.develop.update_git_submodules,
                              always_accept_server_certificate=self.develop.always_accept_server_certificate)
+
+
+class CmdNewFeature(Command):
+    def __init__(self, develop):
+        Command.__init__(self, develop)
+        description = "Create a new feature branch."
+        self.parser = self.develop.parsers.add_parser(
+            "new-feature",
+            description=description)
+        self.develop.parsers._name_parser_map["nf"] = self.develop.parsers._name_parser_map["new-feature"]
+        self.develop.parsers._choices_actions.append(ChoicesPseudoAction(
+            "new-feature", "nf", help=description))
+        self.parser.add_argument(
+            "-v", "--verbose", dest="verbose",
+            action="store_true", default=False,
+            help="""Show output of VCS command.""")
+        self.parser.add_argument(
+            "package-name", nargs="*",
+            help="A package names to create a new feature branch for.")
+        self.parser.set_defaults(func=self)
+
+    def __call__(self, args):
+        sources = {}
+        for name in getattr(args, 'package-name'):
+            if name in self.develop.sources:
+                sources[name] = self.develop.sources[name]
+            else:
+                logger.error('Unknown package %s' % name)
+                sys.exit(1)
+        config = self.develop.config
+        workingcopies = self.get_workingcopies(sources)
+        created = 0
+        for name, source in sources.items():
+            if not workingcopies.new_feature(
+                    name,
+                    verbose=args.verbose,
+                    submodules=self.develop.update_git_submodules,
+                    always_accept_server_certificate=self.develop.always_accept_server_certificate):
+                continue
+            if not source.get('egg', True):
+                continue
+            created += 1
+            config.develop[name] = True
+            logger.info("Activated '%s'." % name)
+        if created:
+            logger.warn("Don't forget to update and run buildout again.")
+            config.save()

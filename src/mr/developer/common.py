@@ -353,6 +353,28 @@ class WorkingCopies(object):
                 logger.error(l)
             sys.exit(1)
 
+    def new_feature(self, name, **kwargs):
+        if name not in self.sources:
+            logger.error(
+                "New feature failed. No source defined for '%s'." % name)
+            sys.exit(1)
+        source = self.sources[name]
+        try:
+            kind = source['kind']
+            wc = self.workingcopytypes.get(kind)(source)
+            if wc is None:
+                logger.error("Unknown repository type '%s'." % kind)
+                sys.exit(1)
+            if not hasattr(wc, 'new_feature'):
+                logger.error(
+                    "New feature not support for repository type '%s'." % kind)
+                sys.exit(1)
+            return wc.new_feature(**kwargs)
+        except WCError:
+            for l in sys.exc_info()[1].args[0].split('\n'):
+                logger.error(l)
+            sys.exit(1)
+
     def update(self, packages, **kwargs):
         the_queue = queue.Queue()
         for name in packages:

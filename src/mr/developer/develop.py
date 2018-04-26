@@ -75,8 +75,11 @@ class Develop(object):
                 args.func(args)
                 return
             self.parser.print_help()
-            print
+            print()
             logger.error("You are not in a path which has mr.developer installed (%s)." % sys.exc_info()[1])
+            return
+        if not hasattr(args, 'func'):
+            self.parser.print_help()
             return
 
         self.config = Config(self.buildout_dir)

@@ -96,6 +96,7 @@ setup(name='mr.developer',
       help = mr.developer.commands:CmdHelp
       info = mr.developer.commands:CmdInfo
       list = mr.developer.commands:CmdList
+      new-feature = mr.developer.commands:CmdNewFeature
       pony = mr.developer.commands:CmdPony
       purge = mr.developer.commands:CmdPurge
       rebuild = mr.developer.commands:CmdRebuild
