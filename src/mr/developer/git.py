@@ -244,7 +244,8 @@ class GitWorkingCopy(common.BaseWorkingCopy):
             self.output((logger.info, "Switching to branch '%s'." % branch))
         elif is_remote:
             # the branch is not local, normal checkout won't work here
-            argv = ["checkout", "-b", branch, "%s/%s" % (self._remote_branch_prefix, branch)]
+            rbranch = "%s/%s" % (self._remote_branch_prefix, branch)
+            argv = ["checkout", "-b", branch, rbranch]
             self.output((logger.info, "Switching to remote branch '%s'." % rbranch))
         elif accept_missing:
             self.output((logger.info, "No such branch %r", branch))
