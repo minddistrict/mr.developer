@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.39b3+md.2 (unreleased)
+1.39b4+md.1 (2018-05-17)
 ------------------------
 
 - Nothing changed yet.
