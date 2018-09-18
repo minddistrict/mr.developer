@@ -251,8 +251,7 @@ class GitWorkingCopy(common.BaseWorkingCopy):
             self.output((logger.info, "No such branch %r", branch))
             return
         else:
-            self.output((logger.error, "No such branch %r", branch))
-            sys.exit(1)
+            raise GitError("No such branch {}".format(branch))
         # runs the checkout with predetermined arguments
         self.git_run(argv, cwd=path)
 
