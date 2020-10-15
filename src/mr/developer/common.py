@@ -630,7 +630,7 @@ class Config(object):
         self._config.add_section('develop')
         for package in sorted(self.develop):
             state = self.develop[package]
-            if state is 'auto':
+            if state == 'auto':
                 self._config.set('develop', package, 'auto')
             elif state is True:
                 self._config.set('develop', package, 'true')
