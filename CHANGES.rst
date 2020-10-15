@@ -4,7 +4,7 @@ Changelog
 1.39b5+md.2 (unreleased)
 ------------------------
 
-- Nothing changed yet.
+- Remove SyntaxWarning.
 
 
 1.39b5+md.1 (2018-09-18)
