@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.39b5+md.2 (unreleased)
+1.39b5+md.2 (2020-10-16)
 ------------------------
 
 - Remove SyntaxWarning.
