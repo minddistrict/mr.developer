@@ -1,10 +1,16 @@
 Changelog
 =========
 
-1.39b5+md.3 (unreleased)
+1.39b5+md.4 (unreleased)
 ------------------------
 
 - Nothing changed yet.
+
+
+1.39b5+md.3 (2026-02-09)
+------------------------
+
+- Prevent using ``setuptools`` 82.x+ for creating the wheel.
 
 
 1.39b5+md.2 (2020-10-16)
