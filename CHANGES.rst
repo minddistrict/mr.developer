@@ -2,8 +2,11 @@ Changelog
 =========
 
 
-3.0.1 (unreleased)
-------------------
+3.0.0+md.1 (2026-10-07)
+-----------------------
+
+Minddistrict build of 3.0.0. Identical to upstream 3.0.0 apart from the
+changes below, which are proposed upstream.
 
 - Add an ``update-strategy`` option for git sources, settable per source or
   for the whole buildout. The default ``merge`` keeps the current behaviour.
