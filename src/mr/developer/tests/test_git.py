@@ -458,3 +458,41 @@ class TestGit:
             assert "<<<<<<<" not in f.read()
 
         shutil.rmtree(src["egg"])
+
+    def testUpdateResetDiscardsLocalCommitsWithoutRemoteChanges(self, mkgitrepo, src):
+        repository = mkgitrepo("repository")
+        self.createDefaultContent(repository)
+        wc = self._branchWorkingCopy(repository, src, "reset")
+        wc.checkout(submodules="never")
+        # A commit made straight in the checkout, with nothing new on the
+        # remote: the checkout is ahead but not behind. An earlier version
+        # worked out ahead/behind for every strategy at once and stopped when
+        # there was nothing to pull in, so the commit `reset` exists to
+        # discard survived a deploy.
+        self._commitInCheckout(src["egg"], "hotfix", "hotfix", "hotfix")
+        assert "hotfix" in self._subjects(src["egg"])
+
+        wc.update(submodules="never")
+
+        assert "hotfix" not in self._subjects(src["egg"])
+        assert wc.status() == "clean"
+
+        shutil.rmtree(src["egg"])
+
+    def testUpdateRebaseFastForwardsWhenOnlyBehind(self, mkgitrepo, src):
+        repository = mkgitrepo("repository")
+        self.createDefaultContent(repository)
+        wc = self._branchWorkingCopy(repository, src, "rebase")
+        wc.checkout(submodules="never")
+        # Nothing of our own, the remote branch simply moves on. `git rebase`
+        # fast-forwards this by itself, which is why the strategy hands it the
+        # whole job instead of working out ahead/behind first.
+        repository("git checkout test", echo=False)
+        repository.add_file("foo3")
+
+        wc.update(submodules="never")
+
+        assert self._subjects(src["egg"])[0] == "foo3"
+        assert wc.status() == "clean"
+
+        shutil.rmtree(src["egg"])

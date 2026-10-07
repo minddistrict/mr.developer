@@ -44,10 +44,9 @@ class GitWorkingCopy(common.BaseWorkingCopy):
     #           deployment hosts, CI, build images.
     _update_strategies = ("merge", "ff-only", "rebase", "reset")
 
-    # Working copy states that stop an update. A 'merge' update has no way to
-    # deal with local commits, so it refuses them as it always has. The other
-    # strategies decide what to do about divergence themselves, after the
-    # fetch, so they only refuse genuinely uncommitted work.
+    # Working copy states that stop an update before it starts, so the user is
+    # asked rather than surprised. They differ per strategy because each
+    # strategy can absorb a different amount.
     _blocking_status = {
         "merge": ("ahead", "diverged", "dirty"),
         "ff-only": ("dirty",),
@@ -197,17 +196,46 @@ class GitWorkingCopy(common.BaseWorkingCopy):
                 sys.exit(1)
 
         rbp = self._remote_branch_prefix
+        rbranch = f"{rbp}/{branch}"
         name = self.source["name"]
         upstream = f"{self._upstream_name}/{branch}"
+
+        # Dispatch on the strategy first, and let each block say for itself
+        # what it does about local commits.
         if strategy == "merge":
-            argv = ["merge", f"{rbp}/{branch}"]
+            # The historical behaviour, unchanged. `update()` refuses a
+            # checkout that is already ahead or diverged before we get here,
+            # so in practice this runs on a fast-forward -- except when the
+            # divergence only appeared in the fetch above, which is exactly
+            # what a rewritten remote branch does.
+            argv = ["merge", rbranch]
+        elif strategy == "reset":
+            # "Match the remote branch exactly" needs nothing worked out
+            # first: reset unconditionally. It is a no-op when the checkout
+            # already matches.
+            ahead, _behind = self.git_ahead_behind(branch)
+            if ahead:
+                self.output(
+                    (
+                        logger.warning,
+                        f"Resetting '{name}' to '{upstream}': "
+                        f"{ahead} local commit(s) are being discarded.",
+                    )
+                )
+            argv = ["reset", "--hard", rbranch]
+        elif strategy == "rebase":
+            # Hand the whole job to git. `git rebase` already fast-forwards a
+            # checkout that is only behind, does nothing when it is already up
+            # to date, and replays the local commits otherwise -- leaving out
+            # the ones that are already upstream, because it compares the
+            # patch rather than the commit id, and those are the superseded
+            # copies the rewrite replaced.
+            return self.git_rebase_onto(stdout_in, stderr_in, branch)
         else:
+            # ff-only. The only strategy that needs the counts, and only so it
+            # can say how far apart the two have drifted.
             ahead, behind = self.git_ahead_behind(branch)
-            if not behind:
-                # Already up to date, or only local commits to keep. Either
-                # way there is nothing from the remote branch to apply.
-                return (stdout_in, stderr_in)
-            if ahead and strategy == "ff-only":
+            if ahead and behind:
                 raise GitError(
                     f"The checkout of '{name}' at '{path}' has diverged from "
                     f"'{upstream}': {ahead} local commit(s) the remote branch "
@@ -224,58 +252,39 @@ class GitWorkingCopy(common.BaseWorkingCopy):
                     f"replays the local commits, 'update-strategy = reset' "
                     f"discards them."
                 )
-            if ahead and strategy == "rebase":
-                # Replay the local commits on top of the rewritten branch.
-                # git leaves out the ones that are already upstream (it
-                # compares the patch, not the commit id), and those are
-                # exactly the superseded copies the rewrite replaced, so what
-                # gets replayed is the work that is really only here.
-                cmd = self.run_git(["rebase", f"{rbp}/{branch}"], cwd=path)
-                stdout, stderr = cmd.communicate()
-                if cmd.returncode != 0:
-                    # Never leave a rebase half-finished. A checkout with
-                    # conflict markers in it and a detached HEAD is the damage
-                    # this strategy exists to avoid, not a smaller version of
-                    # it.
-                    self.run_git(["rebase", "--abort"], cwd=path).communicate()
-                    raise GitError(
-                        f"Replaying the local commits of '{name}' at '{path}' "
-                        f"onto '{upstream}' hit a conflict. The rebase was "
-                        f"aborted, so the checkout is exactly as it was.\n"
-                        f"'{branch}' was rebased and force-pushed, and "
-                        f"{ahead} local commit(s) conflict with the rewrite.\n"
-                        f"Replay them by hand and resolve the conflict:\n"
-                        f"    git -C {path} rebase {upstream}\n"
-                        f"Or discard them and take the remote branch as it is:\n"
-                        f"    git -C {path} reset --hard {upstream}\n"
-                        f"{stderr}"
-                    )
-                self.output(
-                    (
-                        logger.info,
-                        f"Replayed the local commits of '{name}' onto "
-                        f"'{upstream}' (the branch was rewritten).",
-                    )
-                )
-                return (stdout_in + stdout, stderr_in + stderr)
-            if ahead:
-                # strategy == "reset"
-                self.output(
-                    (
-                        logger.warning,
-                        f"Resetting '{name}' to '{upstream}': the remote branch "
-                        f"was rewritten and {ahead} local commit(s) are being "
-                        f"discarded.",
-                    )
-                )
-                argv = ["reset", "--hard", f"{rbp}/{branch}"]
-            else:
-                argv = ["merge", "--ff-only", f"{rbp}/{branch}"]
+            argv = ["merge", "--ff-only", rbranch]
         cmd = self.run_git(argv, cwd=path)
         stdout, stderr = cmd.communicate()
         if cmd.returncode != 0:
             raise GitError(
                 f"git {argv[0]} of remote branch '{upstream}' failed.\n{stderr}"
+            )
+        return (stdout_in + stdout, stderr_in + stderr)
+
+    def git_rebase_onto(self, stdout_in, stderr_in, branch):
+        """Replay whatever is only in this checkout on top of the remote branch."""
+        path = self.source["path"]
+        name = self.source["name"]
+        rbranch = f"{self._remote_branch_prefix}/{branch}"
+        upstream = f"{self._upstream_name}/{branch}"
+        cmd = self.run_git(["rebase", rbranch], cwd=path)
+        stdout, stderr = cmd.communicate()
+        if cmd.returncode != 0:
+            # Never leave a rebase half-finished. A checkout with conflict
+            # markers in it and a detached HEAD is the damage this strategy
+            # exists to avoid, not a smaller version of it.
+            self.run_git(["rebase", "--abort"], cwd=path).communicate()
+            raise GitError(
+                f"Replaying the local commits of '{name}' at '{path}' onto "
+                f"'{upstream}' hit a conflict. The rebase was aborted, so the "
+                f"checkout is exactly as it was.\n"
+                f"'{branch}' was rebased and force-pushed, and the local "
+                f"commits conflict with the rewrite.\n"
+                f"Replay them by hand and resolve the conflict:\n"
+                f"    git -C {path} rebase {upstream}\n"
+                f"Or discard them and take the remote branch as it is:\n"
+                f"    git -C {path} reset --hard {upstream}\n"
+                f"{stderr}"
             )
         return (stdout_in + stdout, stderr_in + stderr)
 
