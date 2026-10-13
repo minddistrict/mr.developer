@@ -321,9 +321,12 @@ class TestGit:
         self._rewriteBranch(repository)
         wc.update(submodules="never")
         # The checkout now matches the rewritten branch exactly.
-        remote_head = Process(cwd=repository.base).check_call(
-            "git rev-parse test", echo=False
-        )[0].decode("utf-8").strip()
+        remote_head = (
+            Process(cwd=repository.base)
+            .check_call("git rev-parse test", echo=False)[0]
+            .decode("utf-8")
+            .strip()
+        )
         assert self._head(src["egg"]) == remote_head
         assert wc.status() == "clean"
 
@@ -340,9 +343,12 @@ class TestGit:
         wc.update(submodules="never")
         # As before: a merge commit, so the checkout keeps the commits the
         # rewrite removed and is now ahead of its remote.
-        parents = Process(cwd=src["egg"]).check_call(
-            "git rev-list --parents -n 1 HEAD", echo=False
-        )[0].decode("utf-8").split()
+        parents = (
+            Process(cwd=src["egg"])
+            .check_call("git rev-list --parents -n 1 HEAD", echo=False)[0]
+            .decode("utf-8")
+            .split()
+        )
         assert len(parents) == 3, "expected a merge commit (two parents)"
         assert wc.status() == "ahead"
 
@@ -385,9 +391,7 @@ class TestGit:
     def _subjects(self, path):
         return [
             line.decode("utf-8")
-            for line in Process(cwd=path).check_call(
-                "git log --format=%s", echo=False
-            )
+            for line in Process(cwd=path).check_call("git log --format=%s", echo=False)
         ]
 
     def testUpdateRebaseKeepsLocalWorkAndDropsSupersededCommits(self, mkgitrepo, src):

@@ -319,8 +319,10 @@ class WorkingCopies:
             elif os.path.islink(source["path"]):
                 logger.info("Skipped update of linked '%s'." % name)
                 continue
-            elif update and not kw.get("force", False) and wc.blocks_update(
-                status := wc.status(), **kw
+            elif (
+                update
+                and not kw.get("force", False)
+                and wc.blocks_update(status := wc.status(), **kw)
             ):
                 if not sys.stdin.isatty():
                     # Nobody can answer the prompt below. Skipping quietly is

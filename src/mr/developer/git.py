@@ -376,9 +376,11 @@ class GitWorkingCopy(common.BaseWorkingCopy):
         # the commits are safe, but the build, the develop-egg and the tests
         # quietly use the configured branch instead. Say so.
         if argv[0] == "checkout" and len(argv) == 2:
-            current = self.run_git(
-                ["symbolic-ref", "--short", "-q", "HEAD"], cwd=path
-            ).communicate()[0].strip()
+            current = (
+                self.run_git(["symbolic-ref", "--short", "-q", "HEAD"], cwd=path)
+                .communicate()[0]
+                .strip()
+            )
             if current and current != argv[1]:
                 self.output(
                     (
