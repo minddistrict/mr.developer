@@ -1,6 +1,6 @@
 from setuptools import setup
 
-version = "3.0.0+md.1"
+version = "3.0.0+md.2.dev0"
 
 
 def get_text_from_file(fn):
